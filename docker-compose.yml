@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: manifold-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: manifold
+      POSTGRES_PASSWORD: manifold
+      POSTGRES_DB: manifold
+    ports:
+      - "5432:5432"
+    volumes:
+      - manifold_pg_data:/var/lib/postgresql/data
+
+  # LaTeX compiler image — build separately with: docker build -t manifold-latex ./docker/latex
+  # Compilation runs on-demand via docker run, not as a persistent service
+
+volumes:
+  manifold_pg_data:

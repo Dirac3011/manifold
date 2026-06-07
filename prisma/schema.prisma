@@ -1,0 +1,356 @@
+// Manifold — collaborative research writing platform
+// Architecture: modular schema designed for multi-file LaTeX and future Lean formalization
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum MathObjectType {
+  THEOREM
+  LEMMA
+  PROPOSITION
+  COROLLARY
+  DEFINITION
+  CONJECTURE
+  EXAMPLE
+  REMARK
+  PROBLEM
+  OPENPROBLEM
+  EXERCISE
+  PROOF
+  EQUATION
+}
+
+enum ObjectStatus {
+  DRAFT
+  NEEDS_PROOF
+  PROOF_INCOMPLETE
+  PROOF_COMPLETE
+  NEEDS_REVIEW
+  REVIEWED
+  SUBMITTED_READY
+  DEPRECATED
+}
+
+// Placeholder for future Lean formalization support
+enum LeanStatus {
+  NOT_STARTED
+  STATEMENT_WRITTEN
+  PROOF_IN_PROGRESS
+  COMPLETE
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  username      String          @unique
+  name          String?
+  bio           String?
+  avatarPath    String?
+  passwordHash  String?         // null for OAuth-only accounts
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  accounts        Account[]
+  ownedProjects   Project[]       @relation("ProjectOwner")
+  memberships     ProjectMember[]
+  assignedObjects MathObject[]    @relation("ObjectAssignee")
+  comments        Comment[]
+  chatMessages    ChatMessage[]
+  snapshots       SourceSnapshot[]
+}
+
+// OAuth accounts (Google, GitHub) — stores access tokens for GitHub API
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+  files       File[]
+  builds      Build[]
+  mathObjects MathObject[]
+  citations   Citation[]
+  labels      Label[]
+  references  Reference[]
+  snapshots   SourceSnapshot[]
+  chatChannels ChatChannel[]
+  chatMessages ChatMessage[]
+  gitLink     ProjectGitLink?
+}
+
+model ChatChannel {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  createdById String
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model ProjectGitLink {
+  id            String    @id @default(cuid())
+  projectId     String    @unique
+  repoOwner     String
+  repoName      String
+  branch        String    @default("main")
+  rootPath      String    @default("") // subfolder in repo, e.g. "paper/"
+  lastPullAt    DateTime?
+  lastPushAt    DateTime?
+  lastCommitSha String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(VIEWER)
+  invitedAt DateTime    @default(now())
+  joinedAt  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model File {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  path      String   // e.g. "main.tex", "references.bib" — supports multi-file later
+  content   String   @db.Text
+  isMain    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mathObjects MathObject[]
+
+  @@unique([projectId, path])
+}
+
+model Build {
+  id              String   @id @default(cuid())
+  projectId       String
+  success         Boolean
+  log             String   @db.Text
+  pdfPath         String?
+  compilerProfile String   @default("draft") // draft | standard | final
+  createdAt       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model MathObject {
+  id          String         @id @default(cuid())
+  projectId   String
+  fileId      String
+  type        MathObjectType
+  label       String?        // stable anchor when present
+  title       String?
+  rawLatex    String         @db.Text
+  startLine   Int
+  endLine     Int
+  status      ObjectStatus   @default(DRAFT)
+  assigneeId  String?
+  contentHash String         // stable ID when no label
+  proofLatex  String?        @db.Text
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Future Lean formalization placeholders
+  leanStatus       LeanStatus @default(NOT_STARTED)
+  leanDeclaration  String?
+  leanFilePath     String?
+  leanNotes        String?    @db.Text
+
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file       File               @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  assignee   User?              @relation("ObjectAssignee", fields: [assigneeId], references: [id])
+  thread     ObjectThread?
+  labels     Label[]
+  references Reference[]        @relation("SourceObject")
+  citedIn    ObjectCitation[]
+  depsFrom   ObjectDependency[] @relation("DepFrom")
+  depsTo     ObjectDependency[] @relation("DepTo")
+
+  @@unique([projectId, label])
+  @@index([projectId, type])
+  @@index([projectId, contentHash])
+}
+
+model ObjectThread {
+  id        String   @id @default(cuid())
+  objectId  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  object   MathObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  comments Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  threadId  String
+  authorId  String
+  parentId  String?
+  content   String   @db.Text // raw source with $$...$$ and [...] math
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread  ObjectThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author  User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?     @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[]    @relation("CommentReplies")
+}
+
+model ChatMessage {
+  id              String   @id @default(cuid())
+  projectId       String
+  channelId       String?
+  authorId        String
+  content         String   @db.Text
+  mentions        String[] // object labels mentioned, e.g. ["thm:main"]
+  forwardedFromId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channel       ChatChannel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author        User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  forwardedFrom ChatMessage?  @relation("ForwardedMessages", fields: [forwardedFromId], references: [id])
+  forwards      ChatMessage[] @relation("ForwardedMessages")
+
+  @@index([channelId, createdAt])
+}
+
+model Citation {
+  id        String   @id @default(cuid())
+  projectId String
+  key       String
+  rawBibtex String   @db.Text
+  doi       String?
+  title     String?
+  authors   String?
+  year      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  usedIn   ObjectCitation[]
+
+  @@unique([projectId, key])
+}
+
+model ObjectCitation {
+  id         String @id @default(cuid())
+  objectId   String
+  citationId String
+  citeKey    String
+
+  object   MathObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  citation Citation   @relation(fields: [citationId], references: [id], onDelete: Cascade)
+
+  @@unique([objectId, citationId])
+}
+
+model Label {
+  id        String   @id @default(cuid())
+  projectId String
+  objectId  String?
+  key       String
+  fileId    String?
+  line      Int?
+  createdAt DateTime @default(now())
+
+  project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  object  MathObject? @relation(fields: [objectId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, key])
+}
+
+model Reference {
+  id             String  @id @default(cuid())
+  projectId      String
+  sourceObjectId String?
+  sourceFileId   String?
+  sourceLine     Int?
+  targetLabel    String
+  refType        String  // ref, eqref, cref, Cref
+  resolved       Boolean @default(false)
+
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceObject MathObject? @relation("SourceObject", fields: [sourceObjectId], references: [id], onDelete: SetNull)
+}
+
+model ObjectDependency {
+  id         String @id @default(cuid())
+  fromId     String
+  toId       String
+  refLabel   String
+
+  from MathObject @relation("DepFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   MathObject @relation("DepTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId, refLabel])
+}
+
+model SourceSnapshot {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String?
+  reason    String   // save, compile, etc.
+  files     Json     // { "main.tex": "...", "references.bib": "..." }
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
