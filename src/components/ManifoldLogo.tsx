@@ -1,21 +1,20 @@
-import Image from "next/image";
-import logo from "@/assets/logo.png";
-
 type Props = {
   size?: number;
   className?: string;
   priority?: boolean;
 };
 
-/** Transparent PNG — bundled at build time; no background wrapper. */
+/** Transparent PNG from /public — plain img avoids next/image optimizer (no sharp in Docker). */
 export function ManifoldLogo({ size = 28, className = "", priority = false }: Props) {
   return (
-    <Image
-      src={logo}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo.png"
       alt=""
       width={size}
       height={size}
-      priority={priority}
+      decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
       className={className}
       aria-hidden
     />

@@ -3,6 +3,7 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  images: { unoptimized: true },
   serverExternalPackages: ["yjs", "y-protocols", "lib0"],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
