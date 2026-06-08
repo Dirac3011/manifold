@@ -62,6 +62,14 @@ Future options (not yet implemented): **XeLaTeX** / **LuaLaTeX** for advanced fo
 
 4. **Multi-file ready** — `File.path` supports arbitrary paths; parser accepts `filePath` param; compile copies all project files into workspace.
 
+## Deploy to production (DigitalOcean)
+
+Full-stack deployment with LaTeX compile, collaboration, and HTTPS:
+
+**→ [deploy/DIGITALOCEAN.md](deploy/DIGITALOCEAN.md)**
+
+Uses Docker Compose on a droplet (GitHub Student Pack credits work well). Vercel alone cannot run the custom Socket.IO server or Docker-based PDF compilation.
+
 ## Prerequisites
 
 - **Node.js** 20+

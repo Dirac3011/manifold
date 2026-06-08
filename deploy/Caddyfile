@@ -1,0 +1,8 @@
+# Default: serve on port 80 (works with droplet IP before you add a domain).
+# For HTTPS with a custom domain, replace this file with deploy/Caddyfile.domain
+# and set your domain in the site block (see deploy/DIGITALOCEAN.md).
+
+:80 {
+	encode gzip
+	reverse_proxy app:3000
+}

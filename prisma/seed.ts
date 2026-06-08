@@ -85,6 +85,9 @@ const SAMPLE_BIB = String.raw`@book{knuth1984,
 `;
 
 async function main() {
+  const removed = await prisma.project.deleteMany();
+  console.log(`Removed ${removed.count} existing project(s).`);
+
   const eulerPasswordHash = await hashPassword("euler");
   const bobPasswordHash = await hashPassword("password123");
 
@@ -110,41 +113,35 @@ async function main() {
     },
   });
 
-  let project = await prisma.project.findFirst({
-    where: { name: "Sample Analysis Paper", ownerId: euler.id },
-  });
-
-  if (!project) {
-    project = await prisma.project.create({
-      data: {
-        name: "Sample Analysis Paper",
-        description: "Demo paper with theorems, lemmas, citations, and cross-references.",
-        ownerId: euler.id,
-        members: {
-          create: [
-            { userId: euler.id, role: "OWNER", joinedAt: new Date() },
-            { userId: bob.id, role: "EDITOR", joinedAt: new Date() },
-          ],
-        },
-        files: {
-          create: [
-            {
-              name: "main.tex",
-              path: "main.tex",
-              content: SAMPLE_MAIN_TEX,
-              isMain: true,
-            },
-            {
-              name: "references.bib",
-              path: "references.bib",
-              content: SAMPLE_BIB,
-              isMain: false,
-            },
-          ],
-        },
+  const project = await prisma.project.create({
+    data: {
+      name: "Sample Analysis Paper",
+      description: "Demo paper with theorems, lemmas, citations, and cross-references.",
+      ownerId: euler.id,
+      members: {
+        create: [
+          { userId: euler.id, role: "OWNER", joinedAt: new Date() },
+          { userId: bob.id, role: "EDITOR", joinedAt: new Date() },
+        ],
       },
-    });
-  }
+      files: {
+        create: [
+          {
+            name: "main.tex",
+            path: "main.tex",
+            content: SAMPLE_MAIN_TEX,
+            isMain: true,
+          },
+          {
+            name: "references.bib",
+            path: "references.bib",
+            content: SAMPLE_BIB,
+            isMain: false,
+          },
+        ],
+      },
+    },
+  });
 
   await syncProjectFromLatex(project.id);
 
@@ -154,35 +151,25 @@ async function main() {
   });
 
   if (thm?.thread) {
-    const existing = await prisma.comment.findFirst({
-      where: { threadId: thm.thread.id },
-    });
-    if (!existing) {
-      await prisma.comment.create({
-        data: {
-          threadId: thm.thread.id,
-          authorId: bob.id,
-          content:
-            "Should we cite a stronger bound here? Consider $$\\|a\\|_\\infty \\le \\|a\\|_2$$ for the sum estimate.",
-        },
-      });
-    }
-  }
-
-  const chatExists = await prisma.chatMessage.findFirst({
-    where: { projectId: project.id },
-  });
-  if (!chatExists) {
-    await prisma.chatMessage.create({
+    await prisma.comment.create({
       data: {
-        projectId: project.id,
-        authorId: euler.id,
+        threadId: thm.thread.id,
+        authorId: bob.id,
         content:
-          "Welcome to the sample project! Check out @thm:main and discuss the proof strategy.",
-        mentions: ["thm:main"],
+          "Should we cite a stronger bound here? Consider $$\\|a\\|_\\infty \\le \\|a\\|_2$$ for the sum estimate.",
       },
     });
   }
+
+  await prisma.chatMessage.create({
+    data: {
+      projectId: project.id,
+      authorId: euler.id,
+      content:
+        "Welcome to the sample project! Check out @thm:main and discuss the proof strategy.",
+      mentions: ["thm:main"],
+    },
+  });
 
   console.log("Seed complete.");
   console.log("  euler@example.com / euler");

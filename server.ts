@@ -9,8 +9,9 @@ import { Server as SocketServer } from "socket.io";
 import { registerCollabServer } from "./src/lib/collab/register-collab-server";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
+const hostname = process.env.HOST ?? "0.0.0.0";
 const port = parseInt(process.env.PORT || "3000", 10);
+const publicUrl = process.env.NEXTAUTH_URL;
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -23,7 +24,11 @@ app.prepare().then(() => {
 
   const io = new SocketServer(httpServer, {
     path: "/socket.io",
-    cors: { origin: dev ? "*" : false, credentials: true },
+    cors: dev
+      ? { origin: "*", credentials: true }
+      : publicUrl
+        ? { origin: publicUrl, credentials: true }
+        : { origin: false, credentials: true },
   });
 
   registerCollabServer(io);
@@ -50,7 +55,8 @@ app.prepare().then(() => {
     });
   });
 
-  httpServer.listen(port, () => {
-    console.log(`> Manifold ready on http://${hostname}:${port}`);
+  httpServer.listen(port, hostname, () => {
+    const url = publicUrl || `http://localhost:${port}`;
+    console.log(`> Manifold ready on ${url} (listening ${hostname}:${port})`);
   });
 });

@@ -1,0 +1,64 @@
+# Production stack for DigitalOcean Droplet (or any Docker host).
+# Requires: Docker + Compose v2, manifold-latex image built on the host.
+#
+#   docker build -t manifold-latex ./docker/latex
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# See deploy/DIGITALOCEAN.md for the full setup guide.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_started
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      STORAGE_PATH: /app/storage
+      COMPILE_WORKSPACE: /app/compile-workspace
+      LATEX_DOCKER_IMAGE: manifold-latex
+    volumes:
+      - app_storage:/app/storage
+      - compile_workspace:/app/compile-workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-manifold}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-manifold}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-manifold} -d ${POSTGRES_DB:-manifold}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  app_storage:
+  compile_workspace:
+  caddy_data:
+  caddy_config:

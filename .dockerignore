@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+storage
+compile-workspace
+.env
+.env.*
+!.env.production.example
+*.md
+!deploy/**/*.md
+terminals
+.cursor
+agent-tools
+agent-transcripts

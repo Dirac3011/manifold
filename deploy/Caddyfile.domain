@@ -1,0 +1,8 @@
+# Copy to Caddyfile after DNS points to your droplet:
+#   cp deploy/Caddyfile.domain deploy/Caddyfile
+# Edit the domain below, then: docker compose -f docker-compose.prod.yml restart caddy
+
+your-domain.example.com {
+	encode gzip
+	reverse_proxy app:3000
+}
