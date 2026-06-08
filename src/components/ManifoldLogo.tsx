@@ -1,4 +1,5 @@
 import Image from "next/image";
+import logo from "@/assets/logo.png";
 
 type Props = {
   size?: number;
@@ -6,17 +7,17 @@ type Props = {
   priority?: boolean;
 };
 
-/** Transparent PNG — no background wrapper; blends with parent surface. */
+/** Transparent PNG — bundled at build time; no background wrapper. */
 export function ManifoldLogo({ size = 28, className = "", priority = false }: Props) {
   return (
     <Image
-      src="/logo.png"
-      alt="Manifold"
+      src={logo}
+      alt=""
       width={size}
       height={size}
       priority={priority}
       className={className}
-      style={{ background: "transparent" }}
+      aria-hidden
     />
   );
 }
