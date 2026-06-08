@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { ManifoldLogo } from "@/components/ManifoldLogo";
 import { authOptions } from "@/lib/auth";
 
 export default async function HomePage() {
@@ -10,6 +11,9 @@ export default async function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4">
       <div className="max-w-2xl text-center">
+        <div className="mb-4 flex justify-center">
+          <ManifoldLogo size={72} priority />
+        </div>
         <h1 className="mb-2 text-4xl font-bold tracking-tight">Manifold</h1>
         <p className="mb-8 text-lg text-[var(--muted)]">
           Collaborative research writing where theorems, lemmas, and proofs become

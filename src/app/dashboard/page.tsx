@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ManifoldLogo } from "@/components/ManifoldLogo";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
@@ -88,9 +89,12 @@ export default function DashboardPage() {
       {creating && <LoadingOverlay message="Creating project…" fullScreen />}
       <header className="border-b border-[var(--border-subtle)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-ui-xl font-semibold tracking-tight">Manifold</h1>
-            <p className="text-ui-xs text-[var(--muted)]">Research manuscripts</p>
+          <div className="flex items-center gap-3">
+            <ManifoldLogo size={32} />
+            <div>
+              <h1 className="text-ui-xl font-semibold tracking-tight">Manifold</h1>
+              <p className="text-ui-xs text-[var(--muted)]">Research manuscripts</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <Link

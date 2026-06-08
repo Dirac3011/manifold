@@ -4,6 +4,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { ManifoldLogo } from "@/components/ManifoldLogo";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 function LoginForm() {
@@ -43,7 +44,10 @@ function LoginForm() {
       onSubmit={handleSubmit}
       className="w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6"
     >
-      <h1 className="mb-6 text-xl font-semibold">Sign in to Manifold</h1>
+      <div className="mb-6 flex items-center gap-2">
+        <ManifoldLogo size={28} />
+        <h1 className="text-xl font-semibold">Sign in to Manifold</h1>
+      </div>
       {error && <p className="mb-4 text-sm text-[var(--danger)]">{error}</p>}
       <label className="mb-4 block">
         <span className="text-xs text-[var(--muted)]">Email</span>

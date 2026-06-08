@@ -14,6 +14,7 @@ import { AppTheme } from "@/lib/theme";
 
 import { RightPanelMode } from "@/lib/discussion/types";
 
+import { ManifoldLogo } from "@/components/ManifoldLogo";
 import { Button } from "@/components/ui/Button";
 
 import { Select } from "@/components/ui/Select";
@@ -234,9 +235,11 @@ export function WorkspaceToolbar({
 
           href="/dashboard"
 
-          className="shrink-0 font-medium text-[var(--muted)] transition-colors hover:text-[var(--accent)]"
+          className="flex shrink-0 items-center gap-1.5 font-medium text-[var(--muted)] transition-colors hover:text-[var(--accent)]"
 
         >
+
+          <ManifoldLogo size={20} />
 
           Manifold
 

@@ -14,6 +14,10 @@ export const metadata: Metadata = {
   title: "Manifold — Research Writing & Collaboration",
   description:
     "Collaborative LaTeX research platform with theorem-object threads, citations, and math-native chat.",
+  icons: {
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    apple: [{ url: "/logo.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
