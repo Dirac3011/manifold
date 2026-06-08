@@ -67,7 +67,10 @@ openssl rand -base64 32
 NEXTAUTH_URL="http://YOUR_DROPLET_IP"    # switch to https://your-domain.com later
 NEXTAUTH_SECRET="paste-secret-here"
 POSTGRES_PASSWORD="strong-db-password"
+COMPILE_WORKSPACE_HOST="/opt/manifold/compile-workspace"
 ```
+
+`COMPILE_WORKSPACE_HOST` must be the **host** path where compile temp files live (same folder as the `./compile-workspace` bind mount). Without it, LaTeX compile fails with *I can't find file `main.tex'*.
 
 Save the file.
 

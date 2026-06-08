@@ -33,6 +33,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const files = await prisma.file.findMany({ where: { projectId } });
+  if (files.length === 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        log: "No LaTeX files in this project. Create a project from the dashboard to get a starter main.tex.",
+        pdfUrl: null,
+      },
+      { status: 400 }
+    );
+  }
   const mainFile = files.find((f) => f.isMain)?.path || "main.tex";
 
   const result = await compileLatex(

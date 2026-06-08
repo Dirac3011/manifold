@@ -18,6 +18,10 @@ const execFileAsync = promisify(execFile);
 const COMPILE_WORKSPACE = path.resolve(
   process.env.COMPILE_WORKSPACE || "./compile-workspace"
 );
+/** Host path for `docker run -v` when the app runs inside a container (Docker socket on host). */
+const COMPILE_WORKSPACE_HOST = path.resolve(
+  process.env.COMPILE_WORKSPACE_HOST || COMPILE_WORKSPACE
+);
 const DOCKER_IMAGE = process.env.LATEX_DOCKER_IMAGE || "manifold-latex";
 
 export type CompileFile = {
@@ -37,6 +41,15 @@ function safeWorkspacePath(projectId: string, ...segments: string[]): string {
   const base = path.resolve(COMPILE_WORKSPACE, projectId);
   const resolved = path.resolve(base, ...segments);
   if (!resolved.startsWith(base)) {
+    throw new Error("Path traversal detected");
+  }
+  return resolved;
+}
+
+function hostWorkspacePath(projectId: string): string {
+  const base = path.resolve(COMPILE_WORKSPACE_HOST, projectId);
+  const resolved = path.resolve(base);
+  if (!resolved.startsWith(path.resolve(COMPILE_WORKSPACE_HOST))) {
     throw new Error("Path traversal detected");
   }
   return resolved;
@@ -83,6 +96,7 @@ export async function compileLatex(
     };
   }
 
+  const hostWsPath = hostWorkspacePath(projectId);
   const dockerArgs = [
     "run",
     "--rm",
@@ -91,7 +105,7 @@ export async function compileLatex(
     "--cpus=1",
     "--pids-limit=256",
     "-v",
-    `${wsPath}:/work:rw`,
+    `${hostWsPath}:/work:rw`,
     "-w",
     "/work",
     "--entrypoint",

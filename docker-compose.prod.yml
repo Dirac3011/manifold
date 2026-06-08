@@ -32,10 +32,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       STORAGE_PATH: /app/storage
       COMPILE_WORKSPACE: /app/compile-workspace
+      COMPILE_WORKSPACE_HOST: ${COMPILE_WORKSPACE_HOST:-/opt/manifold/compile-workspace}
       LATEX_DOCKER_IMAGE: manifold-latex
     volumes:
       - app_storage:/app/storage
-      - compile_workspace:/app/compile-workspace
+      - ./compile-workspace:/app/compile-workspace
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
@@ -59,6 +60,5 @@ services:
 volumes:
   postgres_data:
   app_storage:
-  compile_workspace:
   caddy_data:
   caddy_config:
