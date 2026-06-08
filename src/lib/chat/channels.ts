@@ -13,12 +13,17 @@ export async function ensureGeneralChannel(
       data: {
         projectId,
         name: "general",
-        description: "General discussion",
+        description: "Project notes",
         position: 0,
         createdById,
       },
     });
+  }
 
+  const orphans = await prisma.chatMessage.count({
+    where: { projectId, channelId: null },
+  });
+  if (orphans > 0) {
     await prisma.chatMessage.updateMany({
       where: { projectId, channelId: null },
       data: { channelId: channel.id },

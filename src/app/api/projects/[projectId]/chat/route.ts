@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth, jsonError } from "@/lib/api";
+import { ensureGeneralChannel } from "@/lib/chat/channels";
 import { getProjectAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -53,11 +54,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   const parsed = messageSchema.safeParse(body);
   if (!parsed.success) return jsonError("Invalid input");
 
+  const general = await ensureGeneralChannel(projectId, session!.user.id);
   const mentions = extractMentions(parsed.data.content);
 
   const message = await prisma.chatMessage.create({
     data: {
       projectId,
+      channelId: general.id,
       authorId: session!.user.id,
       content: parsed.data.content,
       mentions,

@@ -25,6 +25,8 @@ export async function GET(_req: Request, { params }: Params) {
 const updateSchema = z.object({
   fileId: z.string(),
   content: z.string(),
+  version: z.number().int().nonnegative().optional(),
+  force: z.boolean().optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: Params) {
@@ -39,9 +41,32 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return jsonError("Invalid input");
 
+  const existing = await prisma.file.findFirst({
+    where: { id: parsed.data.fileId, projectId },
+  });
+  if (!existing) return jsonError("File not found", 404);
+
+  if (
+    parsed.data.version !== undefined &&
+    parsed.data.version !== existing.version &&
+    !parsed.data.force
+  ) {
+    return NextResponse.json(
+      {
+        error: "Conflict",
+        serverContent: existing.content,
+        serverVersion: existing.version,
+      },
+      { status: 409 }
+    );
+  }
+
   const file = await prisma.file.update({
     where: { id: parsed.data.fileId, projectId },
-    data: { content: parsed.data.content },
+    data: {
+      content: parsed.data.content,
+      version: { increment: 1 },
+    },
   });
 
   // Snapshot on save

@@ -50,11 +50,11 @@ export function DependencyGraph({
   });
 
   const typeColor: Record<string, string> = {
-    THEOREM: "#6c9eff",
-    LEMMA: "#a78bfa",
-    DEFINITION: "#4ade80",
-    COROLLARY: "#fbbf24",
-    CONJECTURE: "#f87171",
+    THEOREM: "#7b8fd4",
+    LEMMA: "#9b8ec4",
+    DEFINITION: "#6ba88a",
+    COROLLARY: "#b8a86a",
+    CONJECTURE: "#c48a8a",
     REMARK: "#8b92a8",
   };
 

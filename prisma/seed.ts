@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "../src/lib/password";
 import { syncProjectFromLatex } from "../src/lib/latex/sync-objects";
 
 const prisma = new PrismaClient();
@@ -85,32 +85,33 @@ const SAMPLE_BIB = String.raw`@book{knuth1984,
 `;
 
 async function main() {
-  const passwordHash = await bcrypt.hash("password123", 12);
+  const eulerPasswordHash = await hashPassword("euler");
+  const bobPasswordHash = await hashPassword("password123");
 
-  const alice = await prisma.user.upsert({
-    where: { email: "alice@example.com" },
-    update: {},
+  const euler = await prisma.user.upsert({
+    where: { email: "euler@example.com" },
+    update: { passwordHash: eulerPasswordHash },
     create: {
-      email: "alice@example.com",
-      username: "alice",
-      name: "Alice Researcher",
-      passwordHash,
+      email: "euler@example.com",
+      username: "euler",
+      name: "Leonhard Euler",
+      passwordHash: eulerPasswordHash,
     },
   });
 
   const bob = await prisma.user.upsert({
     where: { email: "bob@example.com" },
-    update: {},
+    update: { passwordHash: bobPasswordHash },
     create: {
       email: "bob@example.com",
       username: "bob",
       name: "Bob Collaborator",
-      passwordHash,
+      passwordHash: bobPasswordHash,
     },
   });
 
   let project = await prisma.project.findFirst({
-    where: { name: "Sample Analysis Paper", ownerId: alice.id },
+    where: { name: "Sample Analysis Paper", ownerId: euler.id },
   });
 
   if (!project) {
@@ -118,10 +119,10 @@ async function main() {
       data: {
         name: "Sample Analysis Paper",
         description: "Demo paper with theorems, lemmas, citations, and cross-references.",
-        ownerId: alice.id,
+        ownerId: euler.id,
         members: {
           create: [
-            { userId: alice.id, role: "OWNER", joinedAt: new Date() },
+            { userId: euler.id, role: "OWNER", joinedAt: new Date() },
             { userId: bob.id, role: "EDITOR", joinedAt: new Date() },
           ],
         },
@@ -175,7 +176,7 @@ async function main() {
     await prisma.chatMessage.create({
       data: {
         projectId: project.id,
-        authorId: alice.id,
+        authorId: euler.id,
         content:
           "Welcome to the sample project! Check out @thm:main and discuss the proof strategy.",
         mentions: ["thm:main"],
@@ -184,7 +185,7 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log("  alice@example.com / password123");
+  console.log("  euler@example.com / euler");
   console.log("  bob@example.com / password123");
 }
 

@@ -5,8 +5,17 @@ import katex from "katex";
  * - Inline: $$...$$
  * - Display: [...]  (single brackets on own lines or inline)
  */
+function applyMarkdown(html: string): string {
+  let out = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
+  out = out.replace(/==([^=\n]+)==/g, '<mark class="md-highlight">$1</mark>');
+  out = out.replace(/^- (.+)$/gm, '<span class="md-bullet">•</span> $1');
+  return out;
+}
+
 export function renderMathContent(raw: string): string {
   let html = escapeHtml(raw);
+  html = applyMarkdown(html);
 
   // Display math: [...] on its own or multiline
   html = html.replace(

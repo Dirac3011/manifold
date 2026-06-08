@@ -101,6 +101,8 @@ Edit `.env` — set `NEXTAUTH_SECRET` to a random string:
 
 **DOI lookup** — set `CROSSREF_MAILTO` to your email (CrossRef polite pool).
 
+**Collaborator invites** — configure `SMTP_*` in `.env` to send invitation emails. Without SMTP, invite links are printed to the server console during development.
+
 ### 2. Start PostgreSQL
 
 ```bash
@@ -134,12 +136,12 @@ Open [http://localhost:3000](http://localhost:3000)
 
 | Email | Password | Role |
 |-------|----------|------|
-| alice@example.com | password123 | Project owner |
+| euler@example.com | euler | Project owner |
 | bob@example.com | password123 | Editor |
 
 ## Usage walkthrough
 
-1. Sign in as **alice@example.com**
+1. Sign in as **euler@example.com**
 2. Open **Sample Analysis Paper** (or create a new project)
 3. Edit `main.tex` in the center editor
 4. Click **Compile** — PDF appears on the right (requires Docker image)
@@ -171,7 +173,9 @@ Open [http://localhost:3000](http://localhost:3000)
 | `/api/integrations/github` | GET | List user's GitHub repos |
 | `/api/projects/:id/references` | GET | Cross-ref analysis + deps |
 | `/api/projects/:id/snapshots` | GET | Save history |
-| `/api/projects/:id/members` | POST | Invite collaborator |
+| `/api/projects/:id/members` | POST | Email collaborator invite |
+| `/api/invites/:token` | GET | Preview invitation |
+| `/api/invites/:token/accept` | POST | Accept invitation |
 
 ## Security notes
 

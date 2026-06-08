@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectStatus, MathObjectType } from "@prisma/client";
 import { requireAuth, jsonError } from "@/lib/api";
+import { objectListInclude } from "@/lib/project/object-list";
 import { getProjectAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -34,20 +35,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         thread: { comments: { some: { resolved: false } } },
       }),
     },
-    include: {
-      assignee: { select: { id: true, name: true, username: true } },
-      thread: {
-        include: {
-          comments: {
-            where: { resolved: false },
-            select: { id: true },
-          },
-        },
-      },
-      citedIn: { include: { citation: true } },
-      depsFrom: { include: { to: { select: { id: true, label: true, type: true, title: true } } } },
-      file: { select: { path: true } },
-    },
+    include: objectListInclude,
     orderBy: [{ startLine: "asc" }],
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
 import {
   BookOpen,
   Clock,
@@ -12,13 +13,34 @@ import {
   Shapes,
   Users,
 } from "lucide-react";
-import { DependencyGraph } from "../DependencyGraph";
-import { ProjectTeamPanel } from "./ProjectTeamPanel";
-import { GitPanel } from "./GitPanel";
-import { ChannelPanel } from "./ChannelPanel";
-import { ProjectSearch } from "./ProjectSearch";
-import { CitationsPanel } from "./CitationsPanel";
 
+const CitationsPanel = dynamic(
+  () => import("./CitationsPanel").then((m) => ({ default: m.CitationsPanel })),
+  { loading: () => <PanelLoading label="References" /> }
+);
+const DependencyGraph = dynamic(
+  () => import("../DependencyGraph").then((m) => ({ default: m.DependencyGraph })),
+  { loading: () => <PanelLoading label="Dependency graph" /> }
+);
+const ProjectSearch = dynamic(
+  () => import("./ProjectSearch").then((m) => ({ default: m.ProjectSearch })),
+  { loading: () => <PanelLoading label="Search" /> }
+);
+const ProjectTeamPanel = dynamic(
+  () => import("./ProjectTeamPanel").then((m) => ({ default: m.ProjectTeamPanel })),
+  { loading: () => <PanelLoading label="Collaborators" /> }
+);
+const GitPanel = dynamic(
+  () => import("./GitPanel").then((m) => ({ default: m.GitPanel })),
+  { loading: () => <PanelLoading label="Git" /> }
+);
+import { IconButton } from "@/components/ui/IconButton";
+import { PanelHeader } from "@/components/ui/PanelHeader";
+import { ObjectListItem } from "@/components/ui/ObjectListItem";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Select } from "@/components/ui/Select";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 export type SidebarTab =
   | "files"
   | "objects"
@@ -27,7 +49,6 @@ export type SidebarTab =
   | "history"
   | "team"
   | "git"
-  | "channels"
   | "search"
   | null;
 
@@ -43,7 +64,8 @@ type MathObject = {
   assigneeId?: string | null;
   assignee?: { id: string; name: string | null; username: string } | null;
   citedIn?: Array<{ citeKey: string; citation: { key: string } }>;
-  thread?: { comments: Array<{ id: string; resolved: boolean }> };
+  thread?: { comments: Array<{ id: string; resolved: boolean }> } | null;
+  depsFrom?: Array<{ to: { label: string | null; type: string } }>;
 };
 
 type Citation = {
@@ -92,62 +114,45 @@ type Props = {
   onObjectFilterChange: (f: string) => void;
   onAssigneeFilterChange: (f: string) => void;
   panelWidth?: number;
+  onOpenReview?: () => void;
+  reviewCount?: number;
+  onObjectDiscussion?: (id: string) => void;
 };
 
 const RAIL_ITEMS: Array<{
   id: SidebarTab;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  badgeKey?: "objects" | "citations";
 }> = [
-  { id: "files", label: "File tree", icon: FileText },
-  { id: "objects", label: "Objects", icon: Shapes },
-  { id: "citations", label: "Citations", icon: BookOpen },
-  { id: "graph", label: "Dependency graph", icon: GitBranch },
-  { id: "channels", label: "Channels", icon: MessageSquare },
+  { id: "files", label: "Files", icon: FileText },
+  { id: "objects", label: "Outline", icon: Shapes, badgeKey: "objects" },
+  { id: "citations", label: "References", icon: BookOpen, badgeKey: "citations" },
+  { id: "graph", label: "Dependencies", icon: GitBranch },
   { id: "search", label: "Search", icon: Search },
-  { id: "team", label: "Team", icon: Users },
+  { id: "team", label: "Collaborators", icon: Users },
   { id: "git", label: "Git", icon: Github },
   { id: "history", label: "History", icon: Clock },
 ];
 
-const TYPE_COLORS: Record<string, string> = {
-  THEOREM: "text-blue-400",
-  LEMMA: "text-purple-400",
-  DEFINITION: "text-green-400",
-  COROLLARY: "text-yellow-400",
-  CONJECTURE: "text-red-400",
-  REMARK: "text-gray-400",
-};
-
-function RailButton({
-  label,
-  icon: Icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  active: boolean;
-  onClick: () => void;
-}) {
+function PanelLoading({ label }: { label: string }) {
   return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
-        active
-          ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-          : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-      }`}
-    >
-      <Icon className="h-4 w-4" />
-      <span className="pointer-events-none absolute left-full z-50 ml-2 hidden whitespace-nowrap rounded bg-[var(--surface)] px-2 py-1 text-xs shadow-md group-hover:block">
-        {label}
-      </span>
-    </button>
+    <p className="px-3 py-8 text-center text-ui-xs text-[var(--muted)]">
+      Loading {label.toLowerCase()}…
+    </p>
   );
 }
+
+const TAB_TITLES: Record<Exclude<SidebarTab, null>, string> = {
+  files: "Files",
+  objects: "Manuscript outline",
+  citations: "References",
+  graph: "Dependency graph",
+  search: "Search",
+  team: "Collaborators",
+  git: "Git",
+  history: "History",
+};
 
 export function Sidebar({
   tab,
@@ -178,6 +183,9 @@ export function Sidebar({
   onObjectFilterChange,
   onAssigneeFilterChange,
   panelWidth = 200,
+  onOpenReview,
+  reviewCount = 0,
+  onObjectDiscussion,
 }: Props) {
   const [newFileName, setNewFileName] = useState("");
   const [addingFile, setAddingFile] = useState(false);
@@ -201,6 +209,16 @@ export function Sidebar({
     return true;
   });
 
+  const badges = useMemo(() => {
+    const unresolved = activeObjects.filter((o) =>
+      o.thread?.comments.some((c) => !c.resolved)
+    ).length;
+    return {
+      objects: unresolved,
+      citations: citationAnalysis.missing.length,
+    };
+  }, [activeObjects, citationAnalysis.missing.length]);
+
   const graphNodes = [
     ...new Map(
       dependencies.flatMap((d) => [
@@ -222,60 +240,99 @@ export function Sidebar({
     setAddingFile(false);
   }
 
-  const panelWide = tab === "channels" || tab === "citations";
+  const panelWide = tab === "citations";
 
   return (
     <div className="flex h-full">
-      <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-[var(--border)] bg-[var(--background)] py-2">
+      <nav
+        className="flex h-full w-11 shrink-0 flex-col items-center gap-0.5 border-r border-[var(--border-subtle)] bg-[var(--background)] py-2"
+        aria-label="Workspace navigation"
+      >
         {RAIL_ITEMS.map((item) => (
-          <RailButton
+          <IconButton
             key={item.id}
             label={item.label}
-            icon={item.icon}
             active={tab === item.id}
+            badge={item.badgeKey ? badges[item.badgeKey] : undefined}
             onClick={() => toggleTab(item.id)}
-          />
+          >
+            <item.icon className="h-[18px] w-[18px] stroke-[1.5]" />
+          </IconButton>
         ))}
+        <div className="mt-auto pt-2">
+          {onOpenReview && (
+            <IconButton
+              label="Review"
+              badge={reviewCount > 0 ? reviewCount : undefined}
+              onClick={onOpenReview}
+            >
+              <MessageSquare className="h-[18px] w-[18px] stroke-[1.5]" />
+            </IconButton>
+          )}
+        </div>
       </nav>
 
       {tab && (
         <div
-          className="flex min-w-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--surface)]"
-          style={{ width: panelWide ? (tab === "citations" ? 300 : 520) : panelWidth }}
+          className="flex min-w-0 flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--surface)]"
+          style={{ width: panelWide ? (tab === "citations" ? 300 : 480) : panelWidth }}
         >
+          {tab !== "citations" && (
+            <PanelHeader
+              title={TAB_TITLES[tab]}
+              subtitle={
+                tab === "objects"
+                  ? `${activeObjects.length} object${activeObjects.length !== 1 ? "s" : ""}`
+                  : undefined
+              }
+            />
+          )}
+
           <div className="flex-1 overflow-y-auto">
             {tab === "files" && (
-              <div className="p-2">
-                <p className="mb-2 px-1 text-xs font-semibold text-[var(--muted)]">File tree</p>
+              <div className="py-1">
                 {files.map((f) => (
                   <button
                     key={f.id}
+                    type="button"
                     onClick={() => onFileSelect(f.id)}
-                    className={`block w-full rounded px-2 py-1.5 text-left text-sm ${
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-ui-sm transition-colors hover:bg-[var(--surface-hover)] ${
                       activeFileId === f.id
                         ? "bg-[var(--surface-hover)] text-[var(--accent)]"
-                        : "hover:bg-[var(--surface-hover)]"
+                        : "text-[var(--foreground)]"
                     }`}
                   >
-                    {f.name}
-                    {f.isMain && <span className="ml-1 text-xs text-[var(--muted)]">main</span>}
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                    <span className="truncate font-mono text-ui-xs">{f.name}</span>
+                    {f.isMain && (
+                      <span className="ml-auto shrink-0 text-ui-xs text-[var(--muted)]">main</span>
+                    )}
                   </button>
                 ))}
+                {files.length === 0 && (
+                  <EmptyState
+                    title="No files yet"
+                    description="Project files will appear here."
+                  />
+                )}
                 {canEdit && (
-                  <div className="mt-3 border-t border-[var(--border)] pt-2">
-                    <input
+                  <div className="mt-2 border-t border-[var(--border-subtle)] px-3 py-3">
+                    <Input
                       value={newFileName}
                       onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder="e.g. chapter2.tex"
-                      className="mb-1 w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+                      placeholder="chapter2.tex"
+                      className="mb-2 text-ui-xs"
+                      onKeyDown={(e) => e.key === "Enter" && handleAddFile()}
                     />
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={handleAddFile}
                       disabled={addingFile}
-                      className="w-full rounded border border-[var(--border)] py-1 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                      className="w-full"
                     >
-                      {addingFile ? "Adding..." : "+ Add file"}
-                    </button>
+                      {addingFile ? "Adding…" : "Add file"}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -283,11 +340,11 @@ export function Sidebar({
 
             {tab === "objects" && (
               <div>
-                <div className="space-y-2 border-b border-[var(--border)] p-2">
-                  <select
+                <div className="space-y-2 border-b border-[var(--border-subtle)] px-3 py-2">
+                  <Select
                     value={objectFilter}
                     onChange={(e) => onObjectFilterChange(e.target.value)}
-                    className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+                    aria-label="Filter objects"
                   >
                     <option value="all">All objects</option>
                     <option value="THEOREM">Theorems</option>
@@ -299,11 +356,11 @@ export function Sidebar({
                     <option value="no-label">Missing label</option>
                     <option value="has-proof">Has proof</option>
                     <option value="cite-issues">Citation issues</option>
-                  </select>
-                  <select
+                  </Select>
+                  <Select
                     value={assigneeFilter}
                     onChange={(e) => onAssigneeFilterChange(e.target.value)}
-                    className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+                    aria-label="Filter by assignee"
                   >
                     <option value="">All assignees</option>
                     {members.map((m) => (
@@ -311,64 +368,84 @@ export function Sidebar({
                         {m.name || m.username}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
-                {filteredObjects.map((o) => {
-                  const isCurrent = currentLine >= o.startLine && currentLine <= o.endLine;
-                  const hasUnresolved = o.thread?.comments.some((c) => !c.resolved);
-                  return (
-                    <button
-                      key={o.id}
-                      onClick={() => onObjectSelect(o.id)}
-                      className={`block w-full border-b border-[var(--border)] px-3 py-2 text-left hover:bg-[var(--surface-hover)] ${
-                        selectedObjectId === o.id ? "bg-[var(--surface-hover)]" : ""
-                      } ${isCurrent ? "border-l-2 border-l-[var(--accent)]" : ""}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium ${TYPE_COLORS[o.type] || ""}`}>
-                          {o.type}
-                        </span>
-                        {hasUnresolved && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]" />
+
+                {filteredObjects.length === 0 ? (
+                  <EmptyState
+                    title="No theorem objects yet"
+                    description="Theorem environments in your LaTeX source will appear here as a structured outline."
+                    hint={
+                      <>
+                        {"\\begin{theorem}\\label{thm:main}"}
+                        <br />
+                        Main Result
+                        <br />
+                        {"\\end{theorem}"}
+                      </>
+                    }
+                  />
+                ) : (
+                  filteredObjects.map((o) => {
+                    const unresolved =
+                      o.thread?.comments.filter((c) => !c.resolved).length ?? 0;
+                    const totalComments = o.thread?.comments.length ?? 0;
+                    const depHint = o.depsFrom?.[0]?.to.label
+                      ? `Uses ${o.depsFrom[0].to.label}`
+                      : null;
+                    return (
+                      <ObjectListItem
+                        key={o.id}
+                        type={o.type}
+                        label={o.label}
+                        title={o.title}
+                        status={o.status}
+                        startLine={o.startLine}
+                        selected={selectedObjectId === o.id}
+                        atCursor={
+                          currentLine >= o.startLine && currentLine <= o.endLine
+                        }
+                        unresolvedCount={unresolved}
+                        totalCommentCount={totalComments}
+                        hasCiteIssue={o.citedIn?.some((c) =>
+                          citationAnalysis.missing.includes(c.citeKey)
                         )}
-                      </div>
-                      <div className="text-xs text-[var(--muted)]">
-                        {o.label || `L${o.startLine}`}
-                        {o.title && ` — ${o.title}`}
-                        {o.assignee && ` · ${o.assignee.name || o.assignee.username}`}
-                      </div>
-                    </button>
-                  );
-                })}
+                        missingLabel={!o.label}
+                        dependencyHint={depHint}
+                        proofComplete={!!o.proofLatex}
+                        onClick={() => onObjectSelect(o.id)}
+                        onDiscussionClick={
+                          onObjectDiscussion
+                            ? () => onObjectDiscussion(o.id)
+                            : undefined
+                        }
+                      />
+                    );
+                  })
+                )}
+
                 {archivedObjects.length > 0 && (
-                  <div className="border-t border-[var(--border)]">
+                  <div className="border-t border-[var(--border-subtle)]">
                     <button
+                      type="button"
                       onClick={() => setShowArchived(!showArchived)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-ui-xs font-medium text-[var(--muted)] hover:bg-[var(--surface-hover)]"
                     >
                       <span>Archived ({archivedObjects.length})</span>
                       <span>{showArchived ? "▾" : "▸"}</span>
                     </button>
                     {showArchived &&
                       archivedObjects.map((o) => (
-                        <button
+                        <ObjectListItem
                           key={o.id}
+                          type={o.type}
+                          label={o.label}
+                          title={o.title}
+                          status="DEPRECATED"
+                          startLine={o.startLine}
+                          selected={selectedObjectId === o.id}
                           onClick={() => onObjectSelect(o.id)}
-                          className={`block w-full border-b border-[var(--border)] px-3 py-2 text-left opacity-70 hover:bg-[var(--surface-hover)] ${
-                            selectedObjectId === o.id ? "bg-[var(--surface-hover)]" : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-[var(--warning)]">archived</span>
-                            <span className={`text-xs font-medium ${TYPE_COLORS[o.type] || ""}`}>
-                              {o.type}
-                            </span>
-                          </div>
-                          <div className="text-xs text-[var(--muted)]">
-                            {o.label || `L${o.startLine}`}
-                            {o.title && ` — ${o.title}`}
-                          </div>
-                        </button>
+                        />
                       ))}
                   </div>
                 )}
@@ -386,27 +463,19 @@ export function Sidebar({
             )}
 
             {tab === "graph" && (
-              <DependencyGraph
-                nodes={graphNodes}
-                edges={dependencies}
-                onSelectNode={onObjectSelect}
-                selectedId={selectedObjectId}
-              />
-            )}
-
-            {tab === "channels" && (
-              <ChannelPanel
-                projectId={projectId}
-                canEdit={canEdit}
-                isOwner={isOwner}
-                objectRefs={activeObjects.map((o) => ({
-                  label: o.label,
-                  id: o.id,
-                  type: o.type,
-                  title: o.title,
-                }))}
-                onMentionClick={onMentionClick}
-              />
+              dependencies.length === 0 ? (
+                <EmptyState
+                  title="No dependency graph yet"
+                  description="References between labeled theorem objects will appear here."
+                />
+              ) : (
+                <DependencyGraph
+                  nodes={graphNodes}
+                  edges={dependencies}
+                  onSelectNode={onObjectSelect}
+                  selectedId={selectedObjectId}
+                />
+              )
             )}
 
             {tab === "search" && (
@@ -432,19 +501,30 @@ export function Sidebar({
             )}
 
             {tab === "history" && (
-              <div className="p-2">
-                {snapshots.map((s) => (
-                  <div key={s.id} className="mb-2 rounded border border-[var(--border)] p-2 text-xs">
-                    <span className="font-medium">
-                      {s.reason.startsWith("compile:")
-                        ? `compile (${s.reason.slice(8)})`
-                        : s.reason}
-                    </span>
-                    <span className="ml-2 text-[var(--muted)]">
-                      {new Date(s.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+              <div className="py-1">
+                {snapshots.length === 0 ? (
+                  <EmptyState
+                    title="No history yet"
+                    description="Snapshots are created when you compile or make significant changes."
+                  />
+                ) : (
+                  snapshots.map((s) => (
+                    <div
+                      key={s.id}
+                      className="border-b border-[var(--border-subtle)] px-3 py-2.5 text-ui-xs"
+                    >
+                      <span className="font-medium text-[var(--foreground)]">
+                        {s.reason.startsWith("compile:")
+                          ? `Compile (${s.reason.slice(8)})`
+                          : s.reason}
+                      </span>
+                      <p className="mt-0.5 text-[var(--muted)]">
+                        {new Date(s.createdAt).toLocaleString()}
+                        {s.user && ` · ${s.user.username}`}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

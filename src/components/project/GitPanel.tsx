@@ -2,6 +2,10 @@
 
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type GitLink = {
   repoOwner: string;
@@ -71,7 +75,7 @@ export function GitPanel({ projectId, isOwner, canEdit, onSyncComplete }: Props)
 
   async function pull() {
     setLoading(true);
-    setStatus("Pulling...");
+    setStatus("Pulling…");
     const res = await fetch(`/api/projects/${projectId}/git/pull`, { method: "POST" });
     const d = await res.json();
     setStatus(res.ok ? `Pulled: ${d.updated?.join(", ") || "no changes"}` : d.error);
@@ -82,10 +86,10 @@ export function GitPanel({ projectId, isOwner, canEdit, onSyncComplete }: Props)
 
   async function push() {
     setLoading(true);
-    setStatus("Pushing...");
+    setStatus("Pushing…");
     const res = await fetch(`/api/projects/${projectId}/git/push`, { method: "POST" });
     const d = await res.json();
-    setStatus(res.ok ? `Pushed: ${d.pushed?.join(", ")}` : d.error);
+    setStatus(res.ok ? `Pushed: ${d.pushed?.join(", ") || "none"}` : d.error);
     setLoading(false);
     if (res.ok) load();
   }
@@ -98,113 +102,112 @@ export function GitPanel({ projectId, isOwner, canEdit, onSyncComplete }: Props)
 
   if (!github.connected) {
     return (
-      <div className="p-3 text-sm">
-        <p className="mb-3 text-[var(--muted)]">
-          Sign in with GitHub to link a repository and push/pull LaTeX files.
-        </p>
-        <button
+      <div className="p-4">
+        <EmptyState
+          title="GitHub not connected"
+          description="Link a repository to push and pull LaTeX source files."
+        />
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => signIn("github", { callbackUrl: window.location.href })}
-          className="w-full rounded bg-[var(--accent)] py-2 text-xs font-medium text-[#0f1117]"
+          className="mt-4 w-full"
         >
           Connect GitHub
-        </button>
+        </Button>
         {github.error && (
-          <p className="mt-2 text-xs text-[var(--danger)]">{github.error}</p>
+          <p className="mt-2 text-ui-xs text-[var(--danger)]">{github.error}</p>
         )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 p-3 text-sm">
+    <div className="space-y-3 p-4 text-ui-sm">
       {link ? (
         <>
-          <div className="rounded border border-[var(--border)] p-2">
-            <p className="font-medium">
+          <div className="rounded-[var(--radius-md)] bg-[var(--background)] px-3 py-2.5">
+            <p className="font-mono text-ui-sm font-medium">
               {link.repoOwner}/{link.repoName}
             </p>
-            <p className="text-xs text-[var(--muted)]">
-              branch: {link.branch}
-              {link.rootPath && ` · path: ${link.rootPath}`}
+            <p className="mt-1 text-ui-xs text-[var(--muted)]">
+              {link.branch}
+              {link.rootPath && ` · ${link.rootPath}`}
             </p>
             {link.lastPullAt && (
-              <p className="text-xs text-[var(--muted)]">
+              <p className="text-ui-xs text-[var(--muted)]">
                 Last pull: {new Date(link.lastPullAt).toLocaleString()}
               </p>
             )}
             {link.lastPushAt && (
-              <p className="text-xs text-[var(--muted)]">
+              <p className="text-ui-xs text-[var(--muted)]">
                 Last push: {new Date(link.lastPushAt).toLocaleString()}
               </p>
             )}
           </div>
           {canEdit && (
             <div className="flex gap-2">
-              <button
-                onClick={pull}
-                disabled={loading}
-                className="flex-1 rounded border border-[var(--border)] py-1.5 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50"
-              >
+              <Button variant="secondary" size="sm" onClick={pull} disabled={loading} className="flex-1">
                 Pull
-              </button>
-              <button
-                onClick={push}
-                disabled={loading}
-                className="flex-1 rounded bg-[var(--accent)] py-1.5 text-xs font-medium text-[#0f1117] disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="primary" size="sm" onClick={push} disabled={loading} className="flex-1">
                 Push
-              </button>
+              </Button>
             </div>
           )}
           {isOwner && (
-            <button onClick={unlink} className="text-xs text-[var(--danger)] hover:underline">
+            <Button variant="ghost" size="sm" onClick={unlink} className="text-[var(--danger)]">
               Unlink repository
-            </button>
+            </Button>
           )}
         </>
       ) : isOwner ? (
         <>
-          <p className="text-xs text-[var(--muted)]">Link this project to a GitHub repo</p>
-          <select
+          <p className="text-ui-xs text-[var(--muted)]">Link this project to a GitHub repository</p>
+          <Select
             value={selectedRepo}
             onChange={(e) => {
               setSelectedRepo(e.target.value);
               const repo = github.repos.find((r) => `${r.owner}/${r.name}` === e.target.value);
               if (repo) setBranch(repo.defaultBranch);
             }}
-            className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs"
           >
-            <option value="">Select repository...</option>
+            <option value="">Select repository…</option>
             {github.repos.map((r) => (
               <option key={r.fullName} value={`${r.owner}/${r.name}`}>
                 {r.fullName}
               </option>
             ))}
-          </select>
-          <input
+          </Select>
+          <Input
             value={branch}
             onChange={(e) => setBranch(e.target.value)}
             placeholder="Branch (main)"
-            className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs"
+            className="text-ui-xs"
           />
-          <input
+          <Input
             value={rootPath}
             onChange={(e) => setRootPath(e.target.value)}
-            placeholder="Subfolder (optional, e.g. paper)"
-            className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs"
+            placeholder="Subfolder (optional)"
+            className="text-ui-xs"
           />
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={linkRepo}
             disabled={loading || !selectedRepo}
-            className="w-full rounded bg-[var(--accent)] py-1.5 text-xs font-medium text-[#0f1117] disabled:opacity-50"
+            className="w-full"
           >
             Link repository
-          </button>
+          </Button>
         </>
       ) : (
-        <p className="text-xs text-[var(--muted)]">No repository linked yet.</p>
+        <EmptyState
+          title="No repository linked"
+          description="The project owner can link a GitHub repository."
+        />
       )}
-      {status && <p className="text-xs text-[var(--muted)]">{status}</p>}
+      {status && <p className="text-ui-xs text-[var(--muted)]">{status}</p>}
     </div>
   );
 }

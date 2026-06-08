@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { CitationListItem } from "@/components/ui/CitationListItem";
+import { PanelHeader } from "@/components/ui/PanelHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 type Citation = {
   key: string;
@@ -37,12 +45,12 @@ type Props = {
 };
 
 const SOURCES: Array<{ id: LookupSource; label: string; placeholder: string }> = [
-  { id: "doi", label: "DOI", placeholder: "10.1000/xyz or doi.org/..." },
-  { id: "arxiv", label: "arXiv", placeholder: "2301.12345 or arxiv.org/abs/..." },
+  { id: "doi", label: "DOI", placeholder: "10.1000/xyz or doi.org/…" },
+  { id: "arxiv", label: "arXiv", placeholder: "2301.12345" },
   { id: "isbn", label: "ISBN", placeholder: "978-0-123456-78-9" },
   { id: "pmid", label: "PubMed", placeholder: "12345678" },
   { id: "url", label: "URL", placeholder: "DOI or arXiv URL" },
-  { id: "bibtex", label: "BibTeX", placeholder: "@article{key, ...}" },
+  { id: "bibtex", label: "BibTeX", placeholder: "@article{key, …}" },
 ];
 
 export function CitationsPanel({
@@ -59,6 +67,8 @@ export function CitationsPanel({
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [syncScope, setSyncScope] = useState<"used" | "all">("used");
+  const [showImport, setShowImport] = useState(false);
+
   async function lookup(save: boolean) {
     if (!input.trim()) return;
     setLoading(true);
@@ -87,10 +97,11 @@ export function CitationsPanel({
         await onRefresh();
       } else {
         if (save) {
-          setStatus(`Added citation "${data.citation?.key || data.suggestedKey}"`);
+          setStatus(`Added "${data.citation?.key || data.suggestedKey}"`);
           setInput("");
           setCustomKey("");
           setPreview(null);
+          setShowImport(false);
           await onRefresh();
         } else {
           setPreview(data);
@@ -136,46 +147,42 @@ export function CitationsPanel({
     return "unused";
   }
 
-  const statusColor = {
-    used: "border-[var(--border)]",
-    unused: "border-[var(--warning)]/50",
-    missing: "border-[var(--danger)]",
-  };
-
-  const statusBadge = {
-    used: "text-[var(--success)]",
-    unused: "text-[var(--warning)]",
-    missing: "text-[var(--danger)]",
-  };
-
   return (
-    <div className="flex h-full flex-col text-sm">
-      <div className="border-b border-[var(--border)] p-3">
-        <div className="mb-2 flex flex-wrap gap-2 text-xs">
-          <span className="rounded bg-[var(--surface-hover)] px-2 py-0.5">
-            {analysis.used.length} used
-          </span>
-          <span className="rounded bg-[var(--surface-hover)] px-2 py-0.5 text-[var(--warning)]">
-            {analysis.unused.length} unused
-          </span>
+    <div className="flex h-full flex-col">
+      <PanelHeader
+        title="References"
+        subtitle={`${citations.length} in library`}
+        actions={
+          canEdit ? (
+            <Button variant="ghost" size="sm" onClick={() => setShowImport(!showImport)}>
+              {showImport ? "Close" : "Import"}
+            </Button>
+          ) : undefined
+        }
+      />
+
+      <div className="border-b border-[var(--border-subtle)] px-3 py-2">
+        <div className="flex flex-wrap gap-2">
+          <StatusPill tone="success">{analysis.used.length} used</StatusPill>
+          <StatusPill tone="warning">{analysis.unused.length} unused</StatusPill>
           {analysis.missing.length > 0 && (
-            <span className="rounded bg-[var(--danger)]/10 px-2 py-0.5 text-[var(--danger)]">
-              {analysis.missing.length} missing
-            </span>
+            <StatusPill tone="danger">{analysis.missing.length} missing</StatusPill>
           )}
         </div>
 
         {canEdit && (
-          <div className="space-y-2">
-            <button
+          <div className="mt-2 space-y-2">
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={syncBibliography}
               disabled={loading}
-              className="w-full rounded bg-[var(--accent)] py-1.5 text-xs font-medium text-[#0f1117] disabled:opacity-50"
+              className="w-full"
             >
-              {loading ? "Working..." : "Sync to bibliography"}
-            </button>
-            <div className="flex gap-2 text-xs">
-              <label className="flex items-center gap-1 text-[var(--muted)]">
+              {loading ? "Syncing…" : "Sync to bibliography"}
+            </Button>
+            <div className="flex gap-3 text-ui-xs text-[var(--muted)]">
+              <label className="flex items-center gap-1.5">
                 <input
                   type="radio"
                   checked={syncScope === "used"}
@@ -183,31 +190,27 @@ export function CitationsPanel({
                 />
                 Cited only
               </label>
-              <label className="flex items-center gap-1 text-[var(--muted)]">
+              <label className="flex items-center gap-1.5">
                 <input
                   type="radio"
                   checked={syncScope === "all"}
                   onChange={() => setSyncScope("all")}
                 />
-                All library
+                Full library
               </label>
             </div>
-            <p className="text-xs text-[var(--muted)]">
-              Adds missing entries to <code>references.bib</code> or inline{" "}
-              <code>\bibitem</code>, matching your existing format.
-            </p>
           </div>
         )}
       </div>
 
       {analysis.missing.length > 0 && (
-        <div className="border-b border-[var(--danger)]/30 bg-[var(--danger)]/5 p-2">
-          <p className="mb-1 text-xs font-medium text-[var(--danger)]">
-            Cited in LaTeX but not in library
+        <div className="border-b border-[var(--danger)]/20 bg-[var(--danger)]/5 px-3 py-2">
+          <p className="text-ui-xs font-medium text-[var(--danger)]">
+            Cited in source but not in library
           </p>
-          <div className="flex flex-wrap gap-1">
+          <div className="mt-1 flex flex-wrap gap-1">
             {analysis.missing.map((k) => (
-              <code key={k} className="rounded bg-[var(--surface)] px-1.5 py-0.5 text-xs">
+              <code key={k} className="font-mono text-ui-xs text-[var(--foreground)]">
                 {k}
               </code>
             ))}
@@ -215,59 +218,51 @@ export function CitationsPanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto">
         {citations.length === 0 ? (
-          <p className="py-4 text-center text-xs text-[var(--muted)]">
-            No citations yet. Import one below.
-          </p>
+          <EmptyState
+            title="No citations imported"
+            description="Build your reference library by importing from DOI, arXiv, ISBN, URL, or BibTeX."
+            hint={
+              <>
+                Paste a DOI: <span className="text-[var(--foreground)]">10.1000/xyz</span>
+                <br />
+                or arXiv: <span className="text-[var(--foreground)]">2301.12345</span>
+              </>
+            }
+          />
         ) : (
-          citations.map((c) => {
-            const st = citationStatus(c.key);
-            return (
-              <div
-                key={c.key}
-                className={`mb-2 rounded border p-2 ${statusColor[st]}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs text-[var(--accent)]">{c.key}</code>
-                      <span className={`text-xs ${statusBadge[st]}`}>{st}</span>
-                    </div>
-                    {c.title && <p className="mt-0.5 text-xs">{c.title}</p>}
-                    {c.authors && (
-                      <p className="text-xs text-[var(--muted)]">{c.authors}</p>
-                    )}
-                    {c.year && (
-                      <p className="text-xs text-[var(--muted)]">{c.year}</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => copyCite(c.key)}
-                    className="shrink-0 text-xs text-[var(--accent)] hover:underline"
-                    title="Copy \\cite{key}"
-                  >
-                    cite
-                  </button>
-                </div>
-              </div>
-            );
-          })
+          citations.map((c) => (
+            <CitationListItem
+              key={c.key}
+              citeKey={c.key}
+              title={c.title}
+              authors={c.authors}
+              year={c.year}
+              status={citationStatus(c.key)}
+              onCopy={() => copyCite(c.key)}
+            />
+          ))
         )}
       </div>
 
-      {canEdit && (
-        <div className="border-t border-[var(--border)] p-3">
-          <p className="mb-2 text-xs font-semibold text-[var(--muted)]">Import citation</p>
+      {canEdit && showImport && (
+        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
+          <SectionHeader className="mb-2">Import citation</SectionHeader>
           <div className="mb-2 flex flex-wrap gap-1">
             {SOURCES.map((s) => (
               <button
                 key={s.id}
-                onClick={() => { setSource(s.id); setPreview(null); setStatus(""); }}
-                className={`rounded px-2 py-0.5 text-xs ${
+                type="button"
+                onClick={() => {
+                  setSource(s.id);
+                  setPreview(null);
+                  setStatus("");
+                }}
+                className={`rounded-[var(--radius-sm)] px-2 py-0.5 text-ui-xs transition-colors ${
                   source === s.id
-                    ? "bg-[var(--accent)] text-[#0f1117]"
-                    : "bg-[var(--surface-hover)] text-[var(--muted)]"
+                    ? "bg-[var(--accent)]/12 text-[var(--accent)]"
+                    : "text-[var(--muted)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
                 {s.label}
@@ -276,61 +271,70 @@ export function CitationsPanel({
           </div>
 
           {source === "bibtex" ? (
-            <textarea
+            <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="@article{key, title=..., author=..., year=...}"
-              rows={5}
-              className="mb-2 w-full resize-none rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 font-mono text-xs"
+              placeholder="@article{key, title=…, author=…, year=…}"
+              rows={4}
+              className="mb-2 font-mono text-ui-xs"
             />
           ) : (
-            <input
+            <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={SOURCES.find((s) => s.id === source)?.placeholder}
-              className="mb-2 w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+              className="mb-2 text-ui-xs"
               onKeyDown={(e) => e.key === "Enter" && lookup(false)}
             />
           )}
 
           {preview && (
-            <div className="mb-2 rounded border border-[var(--border)] bg-[var(--background)] p-2">
-              <p className="text-xs font-medium">{preview.title}</p>
-              <p className="text-xs text-[var(--muted)]">{preview.authors} ({preview.year})</p>
-              <pre className="mt-1 max-h-24 overflow-auto font-mono text-xs text-[var(--muted)]">
-                {preview.bibtex}
-              </pre>
+            <div className="mb-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--background)] p-2">
+              <p className="text-ui-xs font-medium">{preview.title}</p>
+              <p className="text-ui-xs text-[var(--muted)]">
+                {preview.authors} ({preview.year})
+              </p>
             </div>
           )}
 
-          <input
+          <Input
             value={customKey}
             onChange={(e) => setCustomKey(e.target.value)}
             placeholder="Citation key (optional)"
-            className="mb-2 w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+            className="mb-2 text-ui-xs"
           />
 
           <div className="flex gap-2">
             {source !== "bibtex" || !input.includes("@") || input.split("@").length <= 2 ? (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => lookup(false)}
                 disabled={loading || !input.trim()}
-                className="flex-1 rounded border border-[var(--border)] py-1 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                className="flex-1"
               >
                 Preview
-              </button>
+              </Button>
             ) : null}
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => lookup(true)}
               disabled={loading || !input.trim()}
-              className="flex-1 rounded bg-[var(--accent)] py-1 text-xs font-medium text-[#0f1117] disabled:opacity-50"
+              className="flex-1"
             >
-              {loading ? "..." : preview ? "Add" : "Import"}
-            </button>
+              {loading ? "…" : preview ? "Add" : "Import"}
+            </Button>
           </div>
 
           {status && (
-            <p className={`mt-2 text-xs ${status.includes("fail") || status.includes("Invalid") ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>
+            <p
+              className={`mt-2 text-ui-xs ${
+                status.includes("fail") || status.includes("Invalid")
+                  ? "text-[var(--danger)]"
+                  : "text-[var(--muted)]"
+              }`}
+            >
               {status}
             </p>
           )}

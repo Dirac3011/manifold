@@ -1,42 +1,47 @@
 import type { Monaco } from "@monaco-editor/react";
+import { loader } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { registerLatexCompletion } from "./monaco-completion";
 import { setupMonacoThemes } from "./monaco-themes";
 
 let registered = false;
 
-const LATEX_COMMANDS =
-  "documentclass|usepackage|label|ref|eqref|cref|Cref|cite|citep|citet|textbf|textit|emph|section|subsection|chapter|title|author|maketitle|input|include|newcommand|renewcommand|def|frac|sqrt|sum|int|infty|alpha|beta|gamma|delta|epsilon|theta|lambda|mu|pi|sigma|omega";
-
+/**
+ * Overleaf-style LaTeX highlighting:
+ * - \commands (begin, section, label, …) → purple
+ * - {arguments} (lemma, labels, titles, …) → orange-red
+ * - $math$ / \[...\] → lime green
+ * - plain text → default foreground (white)
+ */
 export function setupLatexLanguage(monaco: Monaco) {
   setupMonacoThemes(monaco);
   registerLatexCompletion(monaco);
-  if (registered) return;
-  registered = true;
 
-  monaco.languages.register({ id: "latex" });
-
-  monaco.languages.setLanguageConfiguration("latex", {
-    comments: { lineComment: "%" },
-    brackets: [
-      ["{", "}"],
-      ["[", "]"],
-      ["(", ")"],
-      ["\\begin{", "}\\end{"],
-    ],
-    autoClosingPairs: [
-      { open: "{", close: "}" },
-      { open: "[", close: "]" },
-      { open: "(", close: ")" },
-      { open: "$", close: "$" },
-      { open: "\\begin{", close: "}" },
-    ],
-    surroundingPairs: [
-      { open: "{", close: "}" },
-      { open: "[", close: "]" },
-      { open: "$", close: "$" },
-    ],
-  });
+  if (!registered) {
+    registered = true;
+    monaco.languages.register({ id: "latex", extensions: [".tex", ".latex"] });
+    monaco.languages.setLanguageConfiguration("latex", {
+      comments: { lineComment: "%" },
+      brackets: [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+        ["\\begin{", "}\\end{"],
+      ],
+      autoClosingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "(", close: ")" },
+        { open: "$", close: "$" },
+        { open: "\\begin{", close: "}" },
+      ],
+      surroundingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "$", close: "$" },
+      ],
+    });
+  }
 
   monaco.languages.setMonarchTokensProvider("latex", {
     defaultToken: "",
@@ -45,38 +50,51 @@ export function setupLatexLanguage(monaco: Monaco) {
         [/%.*/, "comment"],
         [/\$\$/, { token: "string.math", next: "@displaymath" }],
         [/\$/, { token: "string.math", next: "@inlinemath" }],
-        [/\\(begin)\{([^}]*)\}/, ["keyword.control", "type.environment"]],
-        [/\\(end)\{([^}]*)\}/, ["keyword.control", "type.environment"]],
-        [
-          new RegExp(`\\\\(${LATEX_COMMANDS})`),
-          { token: "keyword" },
-        ],
-        [/\\[a-zA-Z@]+/, "keyword"],
-        [/\{/, { token: "delimiter.curly", next: "@braces" }],
-        [/\[/, { token: "delimiter.square", next: "@bracket" }],
+        [/\\\[/, { token: "string.math", next: "@displaymathSq" }],
+        [/\\[a-zA-Z@*]+/, "keyword.command"],
+        [/\{/, { token: "delimiter.brace", next: "@inbraces" }],
+        [/\[/, { token: "delimiter.bracket", next: "@inbracket" }],
         [/[0-9]+/, "number"],
       ],
-      braces: [
-        [/[^{}]+/, ""],
-        [/\}/, { token: "delimiter.curly", next: "@pop" }],
-        [/\{/, { token: "delimiter.curly", next: "@push" }],
+      inbraces: [
+        [/\\[a-zA-Z@*]+/, "keyword.command"],
+        [/\{/, { token: "delimiter.brace", next: "@push" }],
+        [/\}/, { token: "delimiter.brace", next: "@pop" }],
+        [/[^{}\\]+/, "type.arg"],
       ],
-      bracket: [
-        [/[^\]]+/, ""],
-        [/\]/, { token: "delimiter.square", next: "@pop" }],
+      inbracket: [
+        [/\\[a-zA-Z@*]+/, "keyword.command"],
+        [/[^\]]+/, "type.arg"],
+        [/\]/, { token: "delimiter.bracket", next: "@pop" }],
       ],
       inlinemath: [
         [/[^$\\]+/, "string.math"],
-        [/\\[a-zA-Z]+/, "keyword.math"],
+        [/\\[a-zA-Z@*]+/, "keyword.math"],
         [/\$/, { token: "string.math", next: "@pop" }],
       ],
       displaymath: [
         [/[^$\\]+/, "string.math"],
-        [/\\[a-zA-Z]+/, "keyword.math"],
+        [/\\[a-zA-Z@*]+/, "keyword.math"],
         [/\$\$/, { token: "string.math", next: "@pop" }],
+      ],
+      displaymathSq: [
+        [/\\\]/, { token: "string.math", next: "@pop" }],
+        [/\\[a-zA-Z@*]+/, "keyword.math"],
+        [/[^\]]+/, "string.math"],
       ],
     },
   });
+}
+
+/** Register latex language as early as possible (before the editor model is created). */
+export function ensureLatexLanguageSetup(): Promise<void> {
+  return loader.init().then((monaco) => {
+    setupLatexLanguage(monaco);
+  });
+}
+
+if (typeof window !== "undefined") {
+  void ensureLatexLanguageSetup();
 }
 
 function findUnmatchedEnvironments(content: string): editor.IMarkerData[] {

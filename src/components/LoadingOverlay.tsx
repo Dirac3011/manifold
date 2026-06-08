@@ -9,7 +9,7 @@ export function LoadingOverlay({ message = "Loading...", fullScreen = false }: P
       className={`${fullScreen ? "fixed" : "absolute"} inset-0 z-50 flex flex-col items-center justify-center bg-[var(--background)]/90 backdrop-blur-sm`}
     >
       <div className="loading-spinner" aria-hidden />
-      <p className="mt-4 text-sm text-[var(--muted)]">{message}</p>
+      <p className="mt-3 text-ui-sm text-[var(--muted)]">{message}</p>
     </div>
   );
 }

@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { MathContent } from "../MathContent";
+import { PanelHeader } from "@/components/ui/PanelHeader";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 
 type Channel = {
   id: string;
@@ -183,27 +188,27 @@ export function ChannelPanel({
 
   return (
     <div className="flex h-full min-w-0">
-      <div className="flex w-36 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--background)]">
-        <div className="border-b border-[var(--border)] px-2 py-2 text-xs font-semibold text-[var(--muted)]">
-          Channels
-        </div>
-        <div className="flex-1 overflow-y-auto">
+      <div className="flex w-32 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--background)]">
+        <PanelHeader title="Channels" className="px-2 py-2" />
+        <div className="flex-1 overflow-y-auto py-1">
           {channels.map((c) => (
-            <div key={c.id} className="group flex items-center">
+            <div key={c.id} className="group/ch flex items-center">
               <button
+                type="button"
                 onClick={() => setActiveChannelId(c.id)}
-                className={`flex-1 px-2 py-1.5 text-left text-xs hover:bg-[var(--surface-hover)] ${
+                className={`flex-1 truncate px-2.5 py-1.5 text-left text-ui-xs transition-colors hover:bg-[var(--surface-hover)] ${
                   activeChannelId === c.id
-                    ? "bg-[var(--surface-hover)] text-[var(--accent)]"
+                    ? "bg-[var(--surface-hover)] font-medium text-[var(--accent)]"
                     : "text-[var(--foreground)]"
                 }`}
               >
-                # {c.name}
+                {c.name}
               </button>
               {isOwner && c.name !== "general" && (
                 <button
+                  type="button"
                   onClick={() => deleteChannel(c.id)}
-                  className="px-1 text-xs text-[var(--muted)] opacity-0 hover:text-[var(--danger)] group-hover:opacity-100"
+                  className="px-1 text-ui-xs text-[var(--muted)] opacity-0 hover:text-[var(--danger)] group-hover/ch:opacity-100"
                   title="Delete channel"
                 >
                   ×
@@ -213,82 +218,86 @@ export function ChannelPanel({
           ))}
         </div>
         {canEdit && (
-          <div className="border-t border-[var(--border)] p-2">
-            <input
+          <div className="border-t border-[var(--border-subtle)] p-2">
+            <Input
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
-              placeholder="new-channel"
-              className="mb-1 w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs"
+              placeholder="channel-name"
+              className="mb-1.5 text-ui-xs"
               onKeyDown={(e) => e.key === "Enter" && createChannel()}
             />
-            <button
-              onClick={createChannel}
-              className="w-full rounded border border-[var(--border)] py-1 text-xs hover:bg-[var(--surface-hover)]"
-            >
-              + Create
-            </button>
+            <Button variant="secondary" size="sm" onClick={createChannel} className="w-full">
+              New channel
+            </Button>
           </div>
         )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="border-b border-[var(--border)] px-3 py-2">
-          <span className="text-sm font-medium">
-            {activeChannel ? `# ${activeChannel.name}` : "Select a channel"}
-          </span>
-          {activeChannel?.description && (
-            <p className="text-xs text-[var(--muted)]">{activeChannel.description}</p>
-          )}
-          {status && <p className="text-xs text-[var(--success)]">{status}</p>}
-        </div>
+        <PanelHeader
+          title={activeChannel?.name ?? "Select a channel"}
+          subtitle={activeChannel?.description ?? undefined}
+        />
+        {status && (
+          <p className="border-b border-[var(--border-subtle)] px-3 py-1 text-ui-xs text-[var(--muted)]">
+            {status}
+          </p>
+        )}
 
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto px-4 py-2">
           {messages.map((m) => (
-            <div key={m.id} className="group mb-3">
-              <div className="mb-0.5 flex items-baseline gap-2">
-                <span className="text-xs font-medium">
+            <div key={m.id} className="channel-message group/msg">
+              <div className="mb-1 flex items-baseline gap-2">
+                <span className="text-ui-xs font-medium text-[var(--foreground)]">
                   {m.author.name || m.author.username}
                 </span>
-                <span className="text-xs text-[var(--muted)]">
-                  {new Date(m.createdAt).toLocaleString()}
+                <span className="text-ui-xs text-[var(--muted)]">
+                  {new Date(m.createdAt).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
                 {canEdit && (
-                  <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100">
-                    <button
+                  <div className="ml-auto flex gap-1 opacity-0 transition-opacity group-hover/msg:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setForwardingId(m.id);
-                        setInput(`↪ Forwarding: `);
+                        setInput("↪ ");
                       }}
-                      className="text-xs text-[var(--muted)] hover:text-[var(--accent)]"
                     >
                       Forward
-                    </button>
+                    </Button>
                     {channels.length > 1 && (
-                      <select
-                        className="rounded border border-[var(--border)] bg-[var(--surface)] px-1 text-xs"
+                      <Select
+                        className="w-auto py-0.5"
                         defaultValue=""
                         onChange={(e) => {
                           if (e.target.value) forwardToChannel(e.target.value, m.id);
                           e.target.value = "";
                         }}
+                        aria-label="Forward to channel"
                       >
-                        <option value="">→ channel</option>
+                        <option value="">→</option>
                         {channels
                           .filter((c) => c.id !== activeChannelId)
                           .map((c) => (
                             <option key={c.id} value={c.id}>
-                              #{c.name}
+                              {c.name}
                             </option>
                           ))}
-                      </select>
+                      </Select>
                     )}
                   </div>
                 )}
               </div>
               {m.forwardedFrom && (
-                <div className="mb-1 rounded border border-[var(--border)] bg-[var(--background)] p-2 text-xs opacity-80">
-                  <span className="text-[var(--muted)]">
-                    Forwarded from #{m.forwardedFrom.channel?.name} ·{" "}
+                <div className="mb-1.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--background)] px-2 py-1.5 text-ui-xs text-[var(--muted)]">
+                  <span>
+                    From {m.forwardedFrom.channel?.name} ·{" "}
                     {m.forwardedFrom.author.name || m.forwardedFrom.author.username}
                   </span>
                   <MathContent content={m.forwardedFrom.content} />
@@ -300,8 +309,9 @@ export function ChannelPanel({
                   {m.mentions.map((label) => (
                     <button
                       key={label}
+                      type="button"
                       onClick={() => onMentionClick(label)}
-                      className="rounded bg-[var(--surface-hover)] px-1.5 py-0.5 text-xs text-[var(--accent)] hover:underline"
+                      className="font-mono text-ui-xs text-[var(--accent)] hover:underline"
                     >
                       @{label}
                     </button>
@@ -314,34 +324,38 @@ export function ChannelPanel({
         </div>
 
         {canEdit && activeChannelId && (
-          <div className="relative border-t border-[var(--border)] p-3">
+          <div className="relative shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
             {forwardingId && (
-              <p className="mb-1 text-xs text-[var(--warning)]">
-                Forwarding message — add a note or press Enter to send
+              <p className="mb-1.5 text-ui-xs text-[var(--muted)]">
+                Forwarding — add a note or press Enter
                 <button
-                  onClick={() => { setForwardingId(null); setInput(""); }}
-                  className="ml-2 text-[var(--muted)] hover:underline"
+                  type="button"
+                  onClick={() => {
+                    setForwardingId(null);
+                    setInput("");
+                  }}
+                  className="ml-2 text-[var(--accent)] hover:underline"
                 >
                   Cancel
                 </button>
               </p>
             )}
             {suggestions.length > 0 && (
-              <div className="absolute bottom-full left-3 right-3 mb-1 max-h-40 overflow-y-auto rounded border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+              <div className="absolute bottom-full left-3 right-3 mb-1 max-h-36 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)]">
                 {suggestions.map((s) => (
                   <button
                     key={s.id}
+                    type="button"
                     onClick={() => insertMention(s.label!)}
-                    className="block w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--surface-hover)]"
+                    className="block w-full px-3 py-1.5 text-left text-ui-xs hover:bg-[var(--surface-hover)]"
                   >
-                    <span className="text-[var(--accent)]">@{s.label}</span>
+                    <span className="font-mono text-[var(--accent)]">@{s.label}</span>
                     <span className="ml-2 text-[var(--muted)]">{s.type}</span>
-                    {s.title && <span className="ml-1 text-[var(--muted)]">— {s.title}</span>}
                   </button>
                 ))}
               </div>
             )}
-            <textarea
+            <Textarea
               value={input}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => {
@@ -350,9 +364,9 @@ export function ChannelPanel({
                   send();
                 }
               }}
-              placeholder="Message… @thm:main for objects, $$math$$ for inline"
-              className="w-full resize-none rounded border border-[var(--border)] bg-[var(--surface)] p-2 text-sm"
+              placeholder="Message — @thm:main for objects, $$math$$ for equations"
               rows={2}
+              className="text-ui-sm"
             />
           </div>
         )}

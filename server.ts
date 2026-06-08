@@ -1,11 +1,12 @@
 /**
- * Custom server: Next.js + Socket.IO for realtime project chat.
+ * Custom server: Next.js + Socket.IO for realtime chat and collaborative editing.
  * Run with: npm run dev
  */
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server as SocketServer } from "socket.io";
+import { registerCollabServer } from "./src/lib/collab/register-collab-server";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -22,8 +23,10 @@ app.prepare().then(() => {
 
   const io = new SocketServer(httpServer, {
     path: "/socket.io",
-    cors: { origin: "*" },
+    cors: { origin: dev ? "*" : false, credentials: true },
   });
+
+  registerCollabServer(io);
 
   io.on("connection", (socket) => {
     socket.on("join-project", (projectId: string) => {

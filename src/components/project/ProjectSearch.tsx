@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/Input";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { StatusPill } from "@/components/ui/StatusPill";
 
 type SearchResult = {
   kind: "file" | "object" | "citation";
@@ -15,6 +18,13 @@ type Props = {
   onSelectFile: (fileId: string, line?: number) => void;
   onSelectObject: (objectId: string) => void;
   onSelectCitation: () => void;
+};
+
+const kindLabel = { file: "File", object: "Object", citation: "Citation" };
+const kindTone = {
+  file: "neutral" as const,
+  object: "accent" as const,
+  citation: "success" as const,
 };
 
 export function ProjectSearch({
@@ -48,39 +58,30 @@ export function ProjectSearch({
     else onSelectCitation();
   }
 
-  const kindLabel = { file: "File", object: "Object", citation: "Citation" };
-  const kindColor = {
-    file: "text-blue-400",
-    object: "text-purple-400",
-    citation: "text-green-400",
-  };
-
   return (
     <div className="flex h-full flex-col p-3">
-      <h3 className="mb-2 text-sm font-semibold">Project search</h3>
-      <input
+      <Input
         autoFocus
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search files, theorems, citations…"
-        className="mb-3 w-full rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+        placeholder="Search files, objects, citations…"
+        className="mb-3"
       />
-      {loading && <p className="text-xs text-[var(--muted)]">Searching…</p>}
+      {loading && <p className="text-ui-xs text-[var(--muted)]">Searching…</p>}
       {!loading && query.length >= 2 && results.length === 0 && (
-        <p className="text-xs text-[var(--muted)]">No results</p>
+        <EmptyState title="No results" description={`Nothing matched "${query}"`} />
       )}
       <div className="flex-1 overflow-y-auto">
         {results.map((r) => (
           <button
             key={`${r.kind}-${r.id}-${r.line ?? 0}`}
+            type="button"
             onClick={() => handleSelect(r)}
-            className="mb-1 block w-full rounded border border-[var(--border)] p-2 text-left hover:border-[var(--accent)]"
+            className="mb-0 block w-full border-b border-[var(--border-subtle)] px-1 py-2.5 text-left transition-colors hover:bg-[var(--surface-hover)]"
           >
-            <span className={`text-xs font-medium ${kindColor[r.kind]}`}>
-              {kindLabel[r.kind]}
-            </span>
-            <p className="text-sm">{r.label}</p>
-            {r.detail && <p className="text-xs text-[var(--muted)]">{r.detail}</p>}
+            <StatusPill tone={kindTone[r.kind]}>{kindLabel[r.kind]}</StatusPill>
+            <p className="mt-1 text-ui-sm">{r.label}</p>
+            {r.detail && <p className="text-ui-xs text-[var(--muted)]">{r.detail}</p>}
           </button>
         ))}
       </div>
