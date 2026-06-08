@@ -69,9 +69,15 @@ async function prepareWorkspace(
       throw new Error(`Invalid file path: ${file.path}`);
     }
     const filePath = safeWorkspacePath(projectId, normalized);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true, mode: 0o777 });
+    await fs.chmod(dir, 0o777);
     await fs.writeFile(filePath, file.content, "utf-8");
+    await fs.chmod(filePath, 0o644);
   }
+
+  // LaTeX container runs as unprivileged `compiler`; app may run as root in Docker.
+  await fs.chmod(wsPath, 0o777);
 
   return wsPath;
 }
