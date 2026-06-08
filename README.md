@@ -2,8 +2,6 @@
 
 **Manifold** is a standalone collaborative research platform for mathematical writing. It combines a LaTeX editor/compiler, theorem-object-based discussion threads, project chat with native math rendering, citation management, and cross-reference dependency graphs.
 
-This is **not** an Overleaf extension — it is an independent web application.
-
 ## Features (MVP)
 
 - **User accounts & projects** — email/password auth, Google & GitHub OAuth, project roles (owner/editor/viewer), collaborator invites
