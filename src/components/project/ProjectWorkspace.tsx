@@ -40,6 +40,7 @@ const PdfViewer = dynamic(
 );
 
 import { Sidebar, SidebarTab } from "./Sidebar";
+import { DocumentOutlinePanel } from "./DocumentOutlinePanel";
 import type { ObjectDetail } from "./ObjectPanel";
 
 const ObjectPanel = dynamic(
@@ -161,6 +162,7 @@ export function ProjectWorkspace({
   const [notesReady, setNotesReady] = useState(false);
   const [narrowMode, setNarrowMode] = useState(false);
   const [narrowTab, setNarrowTab] = useState<NarrowWorkspaceMode>("editor");
+  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [editorSelection, setEditorSelection] = useState<EditorTextSelection | null>(null);
   const [objects, setObjects] = useState<ProjectBootstrap["objects"]>(
     initialData?.objects ?? []
@@ -783,6 +785,28 @@ export function ProjectWorkspace({
     [files, activeFileId, content, effectiveDirty, isCollabEditing, collab]
   );
 
+  const mainFileContent = useMemo(() => {
+    const main = files.find((f) => f.isMain) ?? files[0];
+    if (!main) return "";
+    if (main.id === activeFileId) {
+      if (isCollabEditing) return collab.getContent();
+      return effectiveDirty ? content : main.content;
+    }
+    return main.content;
+  }, [files, activeFileId, content, effectiveDirty, isCollabEditing, collab]);
+
+  async function renameProject(name: string) {
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setProject((prev) => (prev ? { ...prev, name: updated.name } : prev));
+    }
+  }
+
   return (
     <div className="relative flex h-screen flex-col">
       {initialLoading && (
@@ -792,6 +816,8 @@ export function ProjectWorkspace({
       )}
       <WorkspaceToolbar
         projectName={project?.name || "Loading…"}
+        canRenameProject={project?.access.canEdit ?? false}
+        onProjectRename={renameProject}
         activeFileName={activeFile?.name ?? null}
         canEdit={project?.access.canEdit ?? false}
         saveStatus={saveStatus}
@@ -980,29 +1006,38 @@ export function ProjectWorkspace({
 
           <div ref={centerRef} className="flex min-h-0 flex-1 overflow-hidden">
             {(!narrowMode || narrowTab === "editor") && (
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <LatexEditor
-                  key={activeFileId ?? "none"}
-                  ref={editorRef}
-                  value={content}
-                  onChange={(v) => { setContent(v); setDirty(true); }}
-                  onCursorLine={(line) => {
-                    setCurrentLine(line);
-                    collab.reportCursor(line);
-                  }}
-                  onSelectionChange={setEditorSelection}
-                  readOnly={!project?.access.canEdit}
-                  appTheme={appTheme}
-                  projectTexBundle={projectTexBundle}
-                  collab={
-                    collab.yText && collab.awareness
-                      ? {
-                          yText: collab.yText,
-                          awareness: collab.awareness,
-                          synced: collab.fileSynced,
-                        }
-                      : null
-                  }
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <LatexEditor
+                    key={activeFileId ?? "none"}
+                    ref={editorRef}
+                    value={content}
+                    onChange={(v) => { setContent(v); setDirty(true); }}
+                    onCursorLine={(line) => {
+                      setCurrentLine(line);
+                      collab.reportCursor(line);
+                    }}
+                    onSelectionChange={setEditorSelection}
+                    readOnly={!project?.access.canEdit}
+                    appTheme={appTheme}
+                    projectTexBundle={projectTexBundle}
+                    collab={
+                      collab.yText && collab.awareness
+                        ? {
+                            yText: collab.yText,
+                            awareness: collab.awareness,
+                            synced: collab.fileSynced,
+                          }
+                        : null
+                    }
+                  />
+                </div>
+                <DocumentOutlinePanel
+                  content={mainFileContent}
+                  currentLine={currentLine}
+                  onJumpToLine={jumpToSource}
+                  collapsed={outlineCollapsed}
+                  onToggleCollapsed={() => setOutlineCollapsed((v) => !v)}
                 />
               </div>
             )}

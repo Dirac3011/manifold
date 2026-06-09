@@ -175,15 +175,6 @@ export function ObjectPanel({
   const isDeprecated = object.status === "DEPRECATED";
   const typeStyle = OBJECT_TYPE_STYLES[object.type];
 
-  async function toggleResolved(commentId: string, resolved: boolean) {
-    await fetch(`/api/projects/${projectId}/comments/${commentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resolved: !resolved }),
-    });
-    onRefresh();
-  }
-
   async function updateField(data: Record<string, unknown>) {
     await fetch(`/api/projects/${projectId}/objects/${object!.id}`, {
       method: "PATCH",
@@ -193,8 +184,7 @@ export function ObjectPanel({
     onRefresh();
   }
 
-  const unresolvedCount =
-    object.thread?.comments.filter((c) => !c.resolved).length ?? 0;
+  const commentCount = object.thread?.comments.length ?? 0;
 
   const showOverview = inspectTab === "overview";
   const showDiscussion = inspectTab === "discussion";
@@ -228,8 +218,8 @@ export function ObjectPanel({
                     title="New discussion messages"
                   />
                 )}
-                {tab === "discussion" && unresolvedCount > 0 && (
-                  <span className="text-[var(--warning)]">({unresolvedCount})</span>
+                {tab === "discussion" && commentCount > 0 && (
+                  <span className="text-[var(--muted)]">({commentCount})</span>
                 )}
               </span>
             </button>
@@ -377,11 +367,7 @@ export function ObjectPanel({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             <PanelHeader
               title="Object discussion"
-              subtitle={
-                unresolvedCount > 0
-                  ? `${unresolvedCount} unresolved`
-                  : "Review notes on this object"
-              }
+              subtitle="Messages on this object"
               className="border-none px-0 py-0"
             />
 
@@ -398,10 +384,6 @@ export function ObjectPanel({
                     author={c.author}
                     createdAt={c.createdAt ?? new Date().toISOString()}
                     content={c.content}
-                    resolved={c.resolved}
-                    onResolve={
-                      canEdit ? () => toggleResolved(c.id, c.resolved) : undefined
-                    }
                     onReply={
                       canEdit ? () => setReplyingTo(c.id) : undefined
                     }

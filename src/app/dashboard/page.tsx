@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { ManifoldLogo } from "@/components/ManifoldLogo";
+import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import type { ProjectTemplateId } from "@/lib/project/templates";
 
 type Project = {
   id: string;
@@ -30,8 +33,10 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [error, setError] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -43,19 +48,14 @@ export default function DashboardPage() {
     }
   }, [status]);
 
-  async function createProject() {
-    const name = newName.trim();
-    if (!name) {
-      setError("Enter a project name");
-      return;
-    }
+  async function createProject(template: ProjectTemplateId) {
     setCreating(true);
     setError("");
 
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ template }),
     });
 
     const data = await res.json();
@@ -72,9 +72,44 @@ export default function DashboardPage() {
       return;
     }
 
-    setNewName("");
+    setShowCreateMenu(false);
     window.location.href = `/projects/${data.id}`;
   }
+
+  async function saveRename(projectId: string) {
+    const name = renameValue.trim();
+    if (!name) {
+      setRenamingId(null);
+      return;
+    }
+
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setProjects((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, name: updated.name } : p))
+      );
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(typeof data.error === "string" ? data.error : "Failed to rename project");
+    }
+    setRenamingId(null);
+  }
+
+  function startRename(project: Project, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setRenamingId(project.id);
+    setRenameValue(project.name);
+    setError("");
+  }
+
+  const userId = session?.user?.id;
 
   if (status === "loading") {
     return (
@@ -87,6 +122,13 @@ export default function DashboardPage() {
   return (
     <main className="relative min-h-screen bg-[var(--background)]">
       {creating && <LoadingOverlay message="Creating project…" fullScreen />}
+      <CreateProjectDialog
+        open={showCreateMenu}
+        creating={creating}
+        onClose={() => !creating && setShowCreateMenu(false)}
+        onCreate={createProject}
+      />
+
       <header className="border-b border-[var(--border-subtle)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -129,26 +171,14 @@ export default function DashboardPage() {
               Collaborative LaTeX writing with structured theorem objects
             </p>
           </div>
-          <div className="flex gap-2">
-            <Input
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.target.value);
-                setError("");
-              }}
-              placeholder="New project title"
-              className="min-w-[200px]"
-              onKeyDown={(e) => e.key === "Enter" && createProject()}
-            />
-            <Button
-              variant="primary"
-              size="md"
-              onClick={createProject}
-              disabled={creating || !newName.trim()}
-            >
-              {creating ? "Creating…" : "New project"}
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setShowCreateMenu(true)}
+            disabled={creating}
+          >
+            New project
+          </Button>
         </div>
 
         {error && (
@@ -158,42 +188,104 @@ export default function DashboardPage() {
         )}
 
         {projects.length === 0 ? (
-          <EmptyState
-            title="No manuscripts yet"
-            description="Create a project to start writing. A sample paper with theorem objects will be ready to explore."
-          />
+          <div className="text-center">
+            <EmptyState
+              title="No manuscripts yet"
+              description="Create a project from a template to start writing."
+            />
+            <Button
+              variant="primary"
+              size="md"
+              className="mt-4"
+              onClick={() => setShowCreateMenu(true)}
+            >
+              New project
+            </Button>
+          </div>
         ) : (
           <div className="divide-y divide-[var(--border-subtle)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface)]">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                href={`/projects/${p.id}`}
-                className="group block px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="text-ui-md font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)]">
-                      {p.name}
-                    </h3>
-                    {p.description && (
-                      <p className="mt-0.5 line-clamp-1 text-ui-sm text-[var(--muted)]">
-                        {p.description}
-                      </p>
-                    )}
-                    <p className="mt-2 text-ui-xs text-[var(--muted)]">
-                      main.tex · {p._count.mathObjects} object
-                      {p._count.mathObjects !== 1 ? "s" : ""} ·{" "}
-                      {p._count.members} collaborator
-                      {p._count.members !== 1 ? "s" : ""} · updated{" "}
-                      {formatRelative(p.updatedAt)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-ui-xs font-medium text-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100">
-                    Open →
-                  </span>
+            {projects.map((p) => {
+              const canRename = p.owner.id === userId;
+              const isRenaming = renamingId === p.id;
+
+              return (
+                <div
+                  key={p.id}
+                  className="group relative px-5 py-4 transition-colors hover:bg-[var(--surface-hover)]"
+                >
+                  <Link href={`/projects/${p.id}`} className="block">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        {isRenaming ? (
+                          <form
+                            className="flex gap-2"
+                            onClick={(e) => e.preventDefault()}
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              saveRename(p.id);
+                            }}
+                          >
+                            <Input
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              className="text-ui-md font-semibold"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setRenamingId(null);
+                              }}
+                            />
+                            <Button type="submit" variant="primary" size="sm">
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setRenamingId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </form>
+                        ) : (
+                          <h3 className="text-ui-md font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)]">
+                            {p.name}
+                          </h3>
+                        )}
+                        {p.description && !isRenaming && (
+                          <p className="mt-0.5 line-clamp-1 text-ui-sm text-[var(--muted)]">
+                            {p.description}
+                          </p>
+                        )}
+                        {!isRenaming && (
+                          <p className="mt-2 text-ui-xs text-[var(--muted)]">
+                            main.tex · {p._count.mathObjects} object
+                            {p._count.mathObjects !== 1 ? "s" : ""} ·{" "}
+                            {p._count.members} collaborator
+                            {p._count.members !== 1 ? "s" : ""} · updated{" "}
+                            {formatRelative(p.updatedAt)}
+                          </p>
+                        )}
+                      </div>
+                      {!isRenaming && (
+                        <span className="shrink-0 text-ui-xs font-medium text-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100">
+                          Open →
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  {canRename && !isRenaming && (
+                    <button
+                      type="button"
+                      onClick={(e) => startRename(p, e)}
+                      className="absolute right-4 top-4 rounded p-1.5 text-[var(--muted)] opacity-0 transition-opacity hover:bg-[var(--background)] hover:text-[var(--foreground)] group-hover:opacity-100"
+                      title="Rename project"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

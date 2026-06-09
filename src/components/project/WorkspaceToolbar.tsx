@@ -1,7 +1,6 @@
 "use client";
 
-
-
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { ChevronDown, ClipboardList, Moon, PanelLeft, PanelRight, StickyNote, Sun } from "lucide-react";
@@ -42,6 +41,10 @@ type CompileStatus =
 type Props = {
 
   projectName: string;
+
+  canRenameProject?: boolean;
+
+  onProjectRename?: (name: string) => Promise<void>;
 
   activeFileName: string | null;
 
@@ -115,6 +118,10 @@ export function WorkspaceToolbar({
 
   projectName,
 
+  canRenameProject = false,
+
+  onProjectRename,
+
   activeFileName,
 
   canEdit,
@@ -180,6 +187,23 @@ export function WorkspaceToolbar({
   presenceSlot,
 
 }: Props) {
+  const [renamingProject, setRenamingProject] = useState(false);
+  const [renameDraft, setRenameDraft] = useState(projectName);
+
+  useEffect(() => {
+    if (!renamingProject) setRenameDraft(projectName);
+  }, [projectName, renamingProject]);
+
+  async function submitProjectRename() {
+    const name = renameDraft.trim();
+    if (!name || !onProjectRename) {
+      setRenamingProject(false);
+      setRenameDraft(projectName);
+      return;
+    }
+    await onProjectRename(name);
+    setRenamingProject(false);
+  }
 
   const saveLabel =
 
@@ -247,11 +271,43 @@ export function WorkspaceToolbar({
 
         <span className="text-[var(--border)]">/</span>
 
-        <span className="truncate font-medium text-[var(--foreground)]">
-
-          {projectName || "…"}
-
-        </span>
+        {renamingProject && canRenameProject && onProjectRename ? (
+          <input
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onBlur={submitProjectRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitProjectRename();
+              }
+              if (e.key === "Escape") {
+                setRenamingProject(false);
+                setRenameDraft(projectName);
+              }
+            }}
+            className="max-w-[200px] truncate rounded border border-[var(--border)] bg-[var(--background)] px-2 py-0.5 text-ui-sm font-medium"
+            autoFocus
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (canRenameProject && onProjectRename) {
+                setRenameDraft(projectName);
+                setRenamingProject(true);
+              }
+            }}
+            className={`truncate font-medium text-[var(--foreground)] ${
+              canRenameProject && onProjectRename
+                ? "cursor-text hover:text-[var(--accent)]"
+                : "cursor-default"
+            }`}
+            title={canRenameProject ? "Click to rename project" : undefined}
+          >
+            {projectName || "…"}
+          </button>
+        )}
 
         {activeFileName && (
 
